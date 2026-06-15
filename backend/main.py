@@ -21,5 +21,8 @@ def read_root():
     return {"status": "ok", "message": "Banking Analytics Copilot API is running."}
 
 # Include routers here (to be implemented)
-# from api.chat import router as chat_router
-# app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+from api.chat import router as chat_router
+from api.schema import router as schema_router
+
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+app.include_router(schema_router, prefix="/api/schema", tags=["schema"])
