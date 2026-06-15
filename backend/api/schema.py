@@ -4,6 +4,7 @@ from database.config import get_db
 from database.models import SchemaMetadataModel, UserModel
 from security.auth import get_current_user
 from services.oracle_service import DatabaseService
+from services.validation import analyze_sql_query
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import json
@@ -19,6 +20,10 @@ class ConnectionSettings(BaseModel):
     oracle_service_name: Optional[str] = ""
     oracle_username: Optional[str] = ""
     oracle_password: Optional[str] = ""
+
+class ExecuteQueryRequest(BaseModel):
+    sql: str
+    confirm_dml: bool = False
 
 @router.get("/active")
 def get_active_schema(current_user: UserModel = Depends(get_current_user)):
@@ -117,6 +122,41 @@ def get_uploaded_schemas(
             "created_at": r.created_at
         } for r in records
     ]
+
+@router.post("/execute")
+def execute_query(
+    request: ExecuteQueryRequest,
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Execute raw SQL from the SQL Editor with safety validation."""
+    validation = analyze_sql_query(request.sql)
+
+    if validation["action"] == "REJECT":
+        return {"status": "error", "detail": validation["reason"]}
+
+    if validation["action"] == "CONFIRM" and not request.confirm_dml:
+        return {
+            "status": "error",
+            "detail": validation["reason"],
+            "requires_confirmation": True,
+        }
+
+    db_service = DatabaseService()
+    try:
+        result = db_service.execute_query(request.sql)
+        if result.get("status") == "error":
+            return {"status": "error", "detail": result.get("detail", "Query execution failed.")}
+
+        plan = db_service.execute_explain_plan(request.sql)
+        return {
+            "status": "success",
+            "columns": result.get("columns", []),
+            "rows": result.get("rows", []),
+            "engine": result.get("engine", "sqlite"),
+            "plan": plan,
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 @router.delete("/uploads/{schema_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_schema(

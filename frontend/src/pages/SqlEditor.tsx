@@ -36,16 +36,10 @@ export default function SqlEditor() {
     }
 
     try {
-      // Create user audit context via chat endpoint simulation or dedicated history endpoint if needed.
-      // But we can execute this directly on the backend database.
-      // Wait, we can re-run history or run a direct query endpoint. Let's look at `history.py` which has `POST /re-run`
-      // Wait, running raw queries: we should add a quick endpoint in backend to run raw SQL safely or route it through chat.
-      // But we can also add a `POST /api/schema/execute` endpoint if we want, or since we have DatabaseService we can execute.
-      // Let's check: we didn't add a direct `POST /api/schema/execute` endpoint in `schema.py`, but we can run queries through `/api/history/re-run` by mocking history, OR we can quickly add a `POST /api/schema/execute` endpoint to our backend schemas, or execute it via history.
-      // Actually, having a secure query execution endpoint `POST /api/schema/execute` in `schema.py` is the standard way to run queries from an editor. Let's make sure we support it or add it!
-      // Let's check: did we add it? No. Let's check if we can add a route `POST /api/schema/execute` in `backend/api/schema.py` to support SQL Editor!
-      // Let's write `SqlEditor.tsx` to call `/api/schema/execute`.
-      const res = await api.post("/api/schema/execute", { sql });
+      const res = await api.post("/api/schema/execute", {
+        sql,
+        confirm_dml: forceDml,
+      });
       if (res.data.status === "error") {
         setError(res.data.detail);
       } else {
