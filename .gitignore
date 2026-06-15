@@ -216,3 +216,63 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dependencies
+node_modules/
+
+# Production build
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+# React
+*.tsbuildinfo
+
+# Vite
+vite.svg
+
+# Optional package manager files
+.pnp
+.pnp.js
+
+# npm/yarn lock files (keep if working in a team)
+

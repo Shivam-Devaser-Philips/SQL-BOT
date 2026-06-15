@@ -1,31 +1,56 @@
 import re
-from fastapi import HTTPException
 
-# SQL keywords that are potentially dangerous
-FORBIDDEN_KEYWORDS = [
-    "INSERT", "UPDATE", "DELETE", "DROP", "TRUNCATE", 
-    "ALTER", "GRANT", "REVOKE", "MERGE"
-]
+# SQL keywords classification
+REJECTED_KEYWORDS = ["DROP", "TRUNCATE", "ALTER", "GRANT", "REVOKE", "CREATE"]
+CONFIRMATION_KEYWORDS = ["INSERT", "UPDATE", "DELETE", "MERGE"]
 
-def validate_sql(query: str) -> bool:
+def analyze_sql_query(query: str) -> dict:
     """
-    Validates the SQL query to ensure it only contains SELECT statements.
-    Rejects any query containing DML or DDL keywords.
+    Analyzes the SQL query and returns whether it can be run immediately, 
+    requires a confirmation token, or is strictly rejected.
     """
     upper_query = query.upper()
     
-    for keyword in FORBIDDEN_KEYWORDS:
-        # Check for whole word match to avoid matching parts of column names
-        if re.search(rf'\b{keyword}\b', upper_query):
-            raise HTTPException(
-                status_code=403, 
-                detail=f"Query rejected: Found forbidden keyword '{keyword}'. Only SELECT queries are allowed."
-            )
-            
-    if not upper_query.strip().startswith("SELECT") and not upper_query.strip().startswith("WITH"):
-        raise HTTPException(
-            status_code=403,
-            detail="Query rejected: Query must start with SELECT or WITH."
-        )
-        
-    return True
+    # Remove strings and comments to avoid matching keywords inside text literals
+    clean_query = re.sub(r"'(.*?)'", "", upper_query)
+    clean_query = re.sub(r"--.*?\n", "", clean_query)
+    clean_query = re.sub(r"/\*.*?\*/", "", clean_query, flags=re.DOTALL)
+
+    # Check for DDL/administrative commands (Strict Reject)
+    for keyword in REJECTED_KEYWORDS:
+        if re.search(r"\b" + keyword + r"\b", clean_query):
+            return {
+                "safe": False,
+                "action": "REJECT",
+                "reason": f"Query contains forbidden DDL/Administrative keyword: '{keyword}'."
+            }
+
+    # Check for DML write commands (Require Confirmation)
+    for keyword in CONFIRMATION_KEYWORDS:
+        if re.search(r"\b" + keyword + r"\b", clean_query):
+            return {
+                "safe": False,
+                "action": "CONFIRM",
+                "reason": f"Query contains write operation: '{keyword}'. Requires user approval before execution."
+            }
+
+    # Ensure it is a read-only query
+    if not clean_query.strip().startswith("SELECT") and not clean_query.strip().startswith("WITH"):
+        # Could be an explain plan or something, let's allow EXPLAIN
+        if clean_query.strip().startswith("EXPLAIN"):
+            return {
+                "safe": True,
+                "action": "EXECUTE",
+                "reason": "Explain plan query."
+            }
+        return {
+            "safe": False,
+            "action": "REJECT",
+            "reason": "Queries must be standard read-only SELECT or WITH operations."
+        }
+
+    return {
+        "safe": True,
+        "action": "EXECUTE",
+        "reason": "Safe SELECT query."
+    }
